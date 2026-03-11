@@ -1,24 +1,29 @@
-import * as express from 'express';
-import * as cors from 'cors';
-import * as morgan from 'morgan';
-import * as bodyParser from 'body-parser';
- 
-import api from './api';
+import { Server } from 'http';
 
-import * as expressListRoutes from 'express-list-routes';
-const app = express();
+import { createApp } from './app';
+import { env } from './config/env';
 
-app.use(cors());
-app.use(
-  morgan(':method :url :status :res[content-length] - :response-time ms', {
-    stream: { write: (msg) => console.log(msg) },
-  }),
-);
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(api);
+export function startServer(): Server {
+  const app = createApp();
+  const server = app.listen(env.port, () => {
+    console.log(
+      `[${env.appName}] rodando na porta ${env.port} (${env.nodeEnv})`,
+    );
+  });
 
-const port = process.env.PORT || 9000;
-app.listen(port, () => {
-  console.log(`Aplicação - Ativa :D | ${port}`);
-  expressListRoutes(app, { prefix: '' });
-});
+  const gracefulShutdown = (signal: string): void => {
+    console.log(`Recebido ${signal}. Encerrando aplicação...`);
+    server.close((error?: Error) => {
+      if (error) {
+        console.error('Erro ao encerrar servidor', error);
+        process.exit(1);
+      }
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+  return server;
+}
